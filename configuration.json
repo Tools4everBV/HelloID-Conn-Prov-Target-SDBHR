@@ -1,0 +1,67 @@
+[
+  {
+    "key": "BaseUri",
+    "type": "input",
+    "defaultValue": "https://api.sdbstart.nl/api/",
+    "templateOptions": {
+      "label": "Base URI",
+      "placeholder": "https://api.sdbstart.nl/api/",
+      "description": "The BaseURI of the API endpoint(s). Can be found at SDB API Swagger docs: https://api.sdbstart.nl/swagger/ui/index",
+      "required": true
+    }
+  },
+  {
+    "key": "ApiUser",
+    "type": "input",
+    "defaultValue": "",
+    "templateOptions": {
+      "label": "API User",
+      "placeholder": "8700",
+      "description": "The user used to call the WebAPI, this is used as identifier",
+      "required": true
+    }
+  },
+  {
+    "key": "ApiKey",
+    "type": "input",
+    "defaultValue": "",
+    "templateOptions": {
+      "label": "API Key",
+      "type": "password",
+      "placeholder": "37d9ba90-2abf-4399-8dcc-e66fefed36d1",
+      "description": "The key used in the authentication mechanism",
+      "required": true
+    }
+  },
+  {
+    "key": "CustomerNumber",
+    "type": "input",
+    "defaultValue": "",
+    "templateOptions": {
+      "label": "Customer Number",
+      "placeholder": "8700",
+      "description": "The customer number for which the request is executed, you may be authorized for multiple clients within the WebAPI therefore we always want to know which client number the requests are intended for. In many cases the customer number is equal to the user",
+      "required": true
+    }
+  },
+  {
+    "key": "updateOnCorrelate",
+    "type": "checkbox",
+    "defaultValue": false,
+    "templateOptions": {
+      "label": "Update account when correlating and mapped data differs",
+      "required": false,
+      "description": "When toggled, the acount will be updated when the mapped HelloID data differs from the data in the target system in the create action (not just correlate)."
+    }
+  },
+  {
+    "key": "isDebug",
+    "type": "checkbox",
+    "defaultValue": false,
+    "templateOptions": {
+      "label": "Toggle debug logging",
+      "description": "When toggled, debug logging will be displayed",
+      "required": false
+    }
+  }
+]
