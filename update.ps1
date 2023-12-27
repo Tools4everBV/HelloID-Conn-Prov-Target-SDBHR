@@ -1,7 +1,6 @@
 #####################################################
 # HelloID-Conn-Prov-Target-SDBHR-Update
 #
-# Version: 1.0.0
 #####################################################
 # Initialize default values
 $c = $configuration | ConvertFrom-Json
