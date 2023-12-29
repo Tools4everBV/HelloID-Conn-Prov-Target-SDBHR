@@ -64,9 +64,7 @@ function Get-ErrorMessage {
 
         if ( $($ErrorObject.Exception.GetType().FullName -eq "Microsoft.PowerShell.Commands.HttpResponseException") -or $($ErrorObject.Exception.GetType().FullName -eq "System.Net.WebException")) {
             $httpErrorObject = Resolve-HTTPError -Error $ErrorObject
-
             $errorMessage.VerboseErrorMessage = $httpErrorObject.ErrorMessage
-
             $errorMessage.AuditErrorMessage = $httpErrorObject.ErrorMessage
         }
 
@@ -90,22 +88,15 @@ try {
         $correlationValue = $actionContext.CorrelationConfiguration.accountFieldValue
 
         if ([string]::IsNullOrEmpty($correlationProperty)) {
-            $message =  "Correlation is enabled but not configured correctly"
-            Write-Warning $message
-            throw $message
+            throw  "Correlation is enabled but not configured correctly"
         }
 
         if ([string]::IsNullOrEmpty($correlationValue)) {
-            $Message = "The correlation value for [$correlationProperty] is empty. This is likely a mapping issue"
-            Write-Warning $message
-            throw $message
+            throw "The correlation value for [$correlationProperty] is empty. This is likely a mapping issue"
         }
     }
     else {
-        # should be a throw exception
-        $message = "Configuration of correlation is mandatory"
-        Write-Warning $message
-        throw $message
+        throw "Configuration of correlation is mandatory"
     }
 
     Write-Verbose "Creating SDB HR hash with Customer Number [$($actionContext.Configuration.CustomerNumber)]"
@@ -142,30 +133,27 @@ try {
     $currentAccount = Invoke-RestMethod @splatWebRequest -Verbose:$false
 
     if ($null -eq $currentAccount) {
-        $message = "Error querying account where [$correlationProperty)] = [$correlationValue]"
-        Write-Warning $message
-        throw $message
-    } else {
-        Write-Verbose "Correlating to account [$($currentAccount.RoepNaam) $($currentAccount.AchterNaam) ($($currentAccount.Id))]"
+        throw = "Error querying account where [$correlationProperty)] = [$correlationValue]"
+    }
+    Write-Verbose "Correlating to account [$($currentAccount.RoepNaam) $($currentAccount.AchterNaam) ($($currentAccount.Id))]"
 
-        $outputContext.AccountReference = [PSCustomObject]@{
-            Id = $currentAccount.Id
-        }
-
-        if ($dryRun -eq $true) {
-            Write-Warning "DryRun: Would correlate to account [$($currentAccount.RoepNaam) $($currentAccount.AchterNaam) ($($currentAccount.Id))]"\
-        }
-
-        # Define ExportData with account fields and correlation property
-        #$outputContext.Data = $currentAccount.PsObject.Copy() | Select-Object $storeAccountFields
-        $outputContext.Data = $currentAccount | Select-Object $storeAccountFields # Test of this works ok
+    $outputContext.AccountReference = [PSCustomObject]@{
+        Id = $currentAccount.Id
     }
 
+    if ($dryRun -eq $true) {
+        Write-Warning "DryRun: Would correlate to account on field [$($correlationField)] with value: [$($correlationValue)]"
+    }
+
+    # Define ExportData with account fields and correlation property
+    #$outputContext.Data = $currentAccount.PsObject.Copy() | Select-Object $storeAccountFields
+    $outputContext.Data = $currentAccount | Select-Object $storeAccountFields # Test of this works ok
+
     $auditLogs.Add([PSCustomObject]@{
-        Action  = "CorrelateAccount"
-        Message = "Successfully correlated account [$($currentAccount.RoepNaam) $($currentAccount.AchterNaam) ($($currentAccount.Id))]"
-        IsError = $false
-    })
+            Action  = "CorrelateAccount"
+            Message = "Successfully correlated account on field [$($correlationField)] with value: [$($correlationValue)]"
+            IsError = $false
+        })
     $outputContext.AccountCorrelated = $true
     $outputContext.Success = $true
 }
@@ -177,7 +165,7 @@ catch {
 
     $auditLogs.Add([PSCustomObject]@{
             Action  = "CorrelateAccount"
-            Message = "Error correlating account: $($errorMessage.AuditErrorMessage)"
+            Message = "Error correlating account on field [$($correlationField)] with value: [$($correlationValue)]: $($errorMessage.AuditErrorMessage)"
             IsError = $true
         })
 }
