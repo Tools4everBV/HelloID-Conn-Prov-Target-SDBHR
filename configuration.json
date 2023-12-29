@@ -45,13 +45,13 @@
     }
   },
   {
-    "key": "updateOnCorrelate",
+    "key": "updateOnUpdate",
     "type": "checkbox",
     "defaultValue": false,
     "templateOptions": {
-      "label": "Update account when correlating and mapped data differs",
+      "label": "Update on update event",
       "required": false,
-      "description": "When toggled, the acount will be updated when the mapped HelloID data differs from the data in the target system in the create action (not just correlate)."
+      "description": "When toggled, if the mapped data differs from data in SDB, the SDB employee will be updated when an update event is triggerd"
     }
   },
   {
