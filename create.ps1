@@ -161,7 +161,7 @@ catch {
     $ex = $PSItem
     $errorMessage = Get-ErrorMessage -ErrorObject $ex
 
-    Write-Warning "Error correlating account at Line [$($ex.InvocationInfo.ScriptLineNumber)]: $($ex.InvocationInfo.Line). Error: $($errorMessage.VerboseErrorMessage)"
+    Write-Warning "Error correlating account on field [$($correlationField)] with value: [$($correlationValue)] at Line [$($ex.InvocationInfo.ScriptLineNumber)]: $($ex.InvocationInfo.Line). Error: $($errorMessage.VerboseErrorMessage)"
 
     $auditLogs.Add([PSCustomObject]@{
             Action  = "CorrelateAccount"

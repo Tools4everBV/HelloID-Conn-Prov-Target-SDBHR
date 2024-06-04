@@ -2,6 +2,7 @@
 # HelloID-Conn-Prov-Target-SDBHR-Delete
 #
 #####################################################
+
 # Initialize default values
 $c = $configuration | ConvertFrom-Json
 $p = $person | ConvertFrom-Json
