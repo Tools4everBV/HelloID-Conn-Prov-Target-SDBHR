@@ -1,8 +1,15 @@
 #####################################################
 # HelloID-Conn-Prov-Target-SDBHR-Create
-#
+# PowerShell V2
+# Version: 1.0.0
 # See https://api.sdbstart.nl/swagger/ui/index#!/Medewerkers/Medewerkers_Put for supported properties
 #####################################################
+#$actionContext.DryRun = $false
+
+#$MutationDate = $actionContext.Data.beginDatum.Substring(0,10) # startdate from contract
+#$MutationDate=[Datetime]::ParseExact($MutationDate, 'MM/dd/yyyy', $null).ToString('yyyy-MM-dd')
+
+$MutationDate = (Get-Date).ToString("yyyy-MM-dd") #currentdate
 
 # AccountReference must have a value for dryRun
 $outputContext.AccountReference = "Unknown"
@@ -131,7 +138,7 @@ try {
     }
     $currentAccount = $null
     $currentAccount = Invoke-RestMethod @splatWebRequest -Verbose:$false
-
+  
     if ($null -eq $currentAccount) {
         throw = "Error querying account where [$correlationProperty)] = [$correlationValue]"
     }
@@ -140,22 +147,39 @@ try {
     $outputContext.AccountReference = [PSCustomObject]@{
         Id = $currentAccount.Id
     }
-
-    if ($dryRun -eq $true) {
-        Write-Warning "DryRun: Would correlate to account on field [$($correlationField)] with value: [$($correlationValue)]"
+    # Add a message and the result of each of the validations showing what will happen during enforcement
+    if ($actionContext.DryRun -eq $true) {
+        Write-Warning "DryRun: Would correlate to account on field [$correlationProperty] with value: [$($correlationValue)]"
     }
-
-    # Define ExportData with account fields and correlation property
-    #$outputContext.Data = $currentAccount.PsObject.Copy() | Select-Object $storeAccountFields
-    $outputContext.Data = $currentAccount | Select-Object $storeAccountFields # Test of this works ok
-
-    $auditLogs.Add([PSCustomObject]@{
-            Action  = "CorrelateAccount"
-            Message = "Successfully correlated account on field [$($correlationField)] with value: [$($correlationValue)]"
-            IsError = $false
-        })
-    $outputContext.AccountCorrelated = $true
-    $outputContext.Success = $true
+    # Process
+    if (-not($actionContext.DryRun -eq $true)) {
+        
+        Write-Verbose 'Correlating user account'
+        $uri = "$($actionContext.Configuration.BaseUri)/medewerkers/$($currentAccount.Id)/$($MutationDate)"
+        $bodyobject = [PSCustomObject]@{}
+        $bodyobject | Add-Member -MemberType NoteProperty -Name EmailZakelijk -Value $actionContext.Data.EmailZakelijk -Force
+        $body = ($bodyobject | ConvertTo-Json -Depth 10) 
+          
+        $splatCorrelateParams = @{
+            Uri             = $uri
+            Headers         = $headers
+            Method          = "PUT"
+            Body            = ([System.Text.Encoding]::UTF8.GetBytes($body))
+            UseBasicParsing = $true
+        }
+        
+        $responseCorrelateAccount = Invoke-RestMethod @splatCorrelateParams -Verbose:$false 
+        
+        $auditLogMessage = "Successfully correlated account on field [$correlationProperty] with value: [$($correlationValue)]" #"$action account was successful. AccountReference is: [$($outputContext.AccountReference)"
+        $outputContext.success = $true
+        $outputContext.AccountCorrelated = $true
+        $outputContext.AuditLogs.Add([PSCustomObject]@{
+                Action  = 'CreateAccount'
+                Message = $auditLogMessage
+                IsError = $false
+            })
+            
+    }
 }
 catch {
     $ex = $PSItem
@@ -169,3 +193,4 @@ catch {
             IsError = $true
         })
 }
+

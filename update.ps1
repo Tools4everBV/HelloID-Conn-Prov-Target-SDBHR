@@ -1,8 +1,14 @@
 #####################################################
 # HelloID-Conn-Prov-Target-SDBHR-Update
-#
+# PowerShell V2
+# Version: 1.0.0
 # See https://api.sdbstart.nl/swagger/ui/index#!/Medewerkers/Medewerkers_Put for supported properties
 #####################################################
+#$actionContext.DryRun = $false
+
+#$MutationDate = $actionContext.Data.beginDatum.Substring(0,10) # startdate from contract
+#$MutationDate=[Datetime]::ParseExact($MutationDate, 'MM/dd/yyyy', $null).ToString('yyyy-MM-dd')
+#$MutationDate = (Get-Date).ToString("yyyy-MM-dd") #currentdate
 
 # Set to false at start, set to true when no error occured
 $outputContext.Success = $false
@@ -107,11 +113,13 @@ try {
         "Content-Type"   = "application/json"
         "Api-Version"    = "2.0"
     }
-
-    Write-Verbose "Querying account where [Id] = [$($actionContext.AccountReference.Id)]"
-
+    $accountId = $actionContext.References.Account.Id
+    Write-Verbose "Querying account where [Id] = [$($accountId)]"
+    if ($null -eq $accountId) {
+        throw "Not correlated"
+    }
     $splatWebRequest = @{
-        Uri             = "$($actionContext.CorrelationConfiguration.BaseUri)/medewerkersbasic/$($correlation.CorrelationValue)"
+        Uri             = "$($actionContext.Configuration.BaseUri)/medewerkersbasic/$($AccountId)"
         Headers         = $headers
         Method          = "GET"
         ContentType     = "application/json;charset=utf-8"
@@ -119,25 +127,29 @@ try {
     }
     $currentAccount = $null
     $currentAccount = Invoke-RestMethod @splatWebRequest -Verbose:$false
-
+    Write-Verbose -verbose $currentAccount
     if ($null -eq $currentAccount) {
         throw "No account found where  [$($correlation.CorrelationProperty)] = [$($correlation.CorrelationValue)]"
     }
     else {
         # Create previous account object to compare current data with specified account data
         $previousAccount = $currentAccount | Select-Object $updateAccountFields
-
+        Write-Verbose -verbose $previousAccount
+        $outputContext.PreviousData = $previousAccount
         # Calculate changes between current data and provided data
         $splatCompareProperties = @{
             ReferenceObject  = @($previousAccount.PSObject.Properties)
-            DifferenceObject = @($account.PSObject.Properties | Where-Object { $_.Name -in $updateAccountFields }) # Only select the properties to update
+            DifferenceObject = @($actionContext.Data.PSObject.Properties | Where-Object { $_.Name -in $updateAccountFields }) # Only select the properties to update
+            #DifferenceObject = @($account.PSObject.Properties | Where-Object { $_.Name -in $updateAccountFields }) # Only select the properties to update
+
         }
         $changedProperties = $null
         $changedProperties = (Compare-Object @splatCompareProperties -PassThru)
         $oldProperties = $changedProperties.Where( { $_.SideIndicator -eq "<=" })
         $newProperties = $changedProperties.Where( { $_.SideIndicator -eq "=>" })
 
-        if (($newProperties | Measure-Object).Count -ge 1) { # and update is enabled
+        if (($newProperties | Measure-Object).Count -ge 1) {
+            # and update is enabled
             # Create custom object with old and new values
             $changedPropertiesObject = [PSCustomObject]@{
                 OldValues = @{}
@@ -163,11 +175,16 @@ try {
             $updateAction = 'NoChanges'
         }
     }
-
+    
+    
+    # Process
+    
     switch ($updateAction) {
         #region Update account
         "Update" {
             # Update account
+            $uri = "$($actionContext.Configuration.BaseUri)/medewerkers/$($currentAccount.Id)/$($MutationDate)"
+       
             try {
                 # Create custom account object for update and set with default properties and values
                 $updateAccountObject = [PSCustomObject]@{}
@@ -179,29 +196,26 @@ try {
 
                 $body = ($updateAccountObject | ConvertTo-Json -Depth 10)
                 $splatWebRequest = @{
-                    Uri             = "$($actionContext.CorrelationConfiguration.BaseUri)/medewerkers/$($currentAccount.Id)"
+                    Uri             = $uri
                     Headers         = $headers
                     Method          = "PUT"
                     Body            = ([System.Text.Encoding]::UTF8.GetBytes($body))
-                    ContentType     = "application/json;charset=utf-8"
+                    #ContentType     = "application/json;charset=utf-8"
                     UseBasicParsing = $true
                 }
 
                 Write-Verbose "Updating account [$($currentAccount.RoepNaam) $($currentAccount.AchterNaam) ($($currentAccount.Id))]. Account object: $($updateAccountObject | ConvertTo-Json -Depth 10)"
 
-                if (-not($dryRun -eq $true)) {
+                if (-not($actionContext.DryRun -eq $true)) {
                     $updatedAccount = Invoke-RestMethod @splatWebRequest -Verbose:$false
 
-                    # Set aRef object for use in futher actions
-                    $aRef = [PSCustomObject]@{
-                        Id = $updatedAccount.Id
-                    }
-
-                    $auditLogs.Add([PSCustomObject]@{
-                            # Action  = "" # Optional
+                    $outputContext.success = $true
+                    $outputContext.AuditLogs.Add([PSCustomObject]@{
                             Message = "Successfully updated account [$($currentAccount.RoepNaam) $($currentAccount.AchterNaam) ($($updatedAccount.Id))]. Updated properties: $($changedPropertiesObject | ConvertTo-Json -Depth 10)"
+                            #Message = 'Update account was successful'
                             IsError = $false
                         })
+                    
                 }
                 else {
                     Write-Warning "DryRun: Would update account [$($currentAccount.RoepNaam) $($currentAccount.AchterNaam) ($($currentAccount.Id))]. Updated properties: $($changedPropertiesObject | ConvertTo-Json -Depth 10)"
@@ -214,12 +228,13 @@ try {
                 $errorMessage = Get-ErrorMessage -ErrorObject $ex
 
                 Write-Verbose "Error at Line [$($ex.InvocationInfo.ScriptLineNumber)]: $($ex.InvocationInfo.Line). Error: $($errorMessage.VerboseErrorMessage)"
-
-                $auditLogs.Add([PSCustomObject]@{
-                        # Action  = "" # Optional
-                        Message = "Error updating account [$($currentAccount.RoepNaam) $($currentAccount.AchterNaam) ($($currentAccount.Id))]. Error Message: $($errorMessage.AuditErrorMessage). Account object: $($updateAccountObject | ConvertTo-Json -Depth 10)"
+                $outputContext.Success = $false
+                $auditMessage = "Could not update SDB account. Error: $($errorMessage)"
+                $outputContext.AuditLogs.Add([PSCustomObject]@{
+                        Message = $auditMessage
                         IsError = $true
                     })
+                
             }
 
             break
@@ -228,59 +243,27 @@ try {
         #region No changes to account
         "NoChanges" {
             Write-Verbose "No changes needed for account [$($currentAccount.RoepNaam) $($currentAccount.AchterNaam) ($($currentAccount.Id))]"
+            
+            $outputContext.success = $true
+            $outputContext.AuditLogs.Add([PSCustomObject]@{
+                    Message = 'No changes will be made to the account during enforcement'
+                    IsError = $false
+                })
 
-            if (-not($dryRun -eq $true)) {
-                # Set aRef object for use in futher actions
-                $aRef = [PSCustomObject]@{
-                    Id = $currentAccount.Id
-                }
 
-                # $auditLogs.Add([PSCustomObject]@{
-                #         # Action  = "" # Optional
-                #         Message = "No changes needed for account [$($currentAccount.RoepNaam) $($currentAccount.AchterNaam) ($($currentAccount.Id))]"
-                #         IsError = $false
-                #     })
-            }
-            else {
-                Write-Warning "DryRun: No changes needed for account [$($currentAccount.RoepNaam) $($currentAccount.AchterNaam) ($($currentAccount.Id))]"
-            }
 
             break
         }
         #endregion No changes to account
     }
 
-    # Define ExportData with account fields and correlation property 
-    $exportData = $account.PsObject.Copy() | Select-Object $storeAccountFields
-    # Add correlation property to exportdata
-    $exportData | Add-Member -MemberType NoteProperty -Name $correlation.CorrelationProperty -Value $correlation.CorrelationValue -Force
-    # Add aRef properties to exportdata
-    foreach ($aRefProperty in $aRef.PSObject.Properties) {
-        $exportData | Add-Member -MemberType NoteProperty -Name $aRefProperty.Name -Value $aRefProperty.Value -Force
-    }
+ 
 }
 finally {
     # Check if auditLogs contains errors, if no errors are found, set success to true
-    if (-not($auditLogs.IsError -contains $true)) {
+    if (-not($outputContext.success -eq $false)) {
         $success = $true
     }
 
-    # Send results
-    $result = [PSCustomObject]@{
-        Success          = $success
-        AccountReference = $aRef
-        AuditLogs        = $auditLogs
-        PreviousAccount  = $previousAccount
-        Account          = $account
 
-        # Optionally return data for use in other systems
-        ExportData       = $exportData
-    }
-
-    Write-Output ($result | ConvertTo-Json -Depth 10)
-}
-
-        # Add aRef properties to exportdata # i don't think this is necessary, check after testing
-        #foreach ($aRefProperty in $outputContext.AccountReference.PSObject.Properties) {
-        #    $outputContext.Data | Add-Member -MemberType NoteProperty -Name $aRefProperty.Name -Value $aRefProperty.Value -Force
-        #}
+}       
