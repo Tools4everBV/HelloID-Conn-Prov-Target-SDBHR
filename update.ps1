@@ -4,11 +4,6 @@
 # Version: 1.0.0
 # See https://api.sdbstart.nl/swagger/ui/index#!/Medewerkers/Medewerkers_Put for supported properties
 #####################################################
-#$actionContext.DryRun = $false
-
-#$MutationDate = $actionContext.Data.beginDatum.Substring(0,10) # startdate from contract
-#$MutationDate=[Datetime]::ParseExact($MutationDate, 'MM/dd/yyyy', $null).ToString('yyyy-MM-dd')
-#$MutationDate = (Get-Date).ToString("yyyy-MM-dd") #currentdate
 
 # Set to false at start, set to true when no error occured
 $outputContext.Success = $false

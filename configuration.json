@@ -45,16 +45,6 @@
     }
   },
   {
-    "key": "updateOnUpdate",
-    "type": "checkbox",
-    "defaultValue": false,
-    "templateOptions": {
-      "label": "Update on update event",
-      "required": false,
-      "description": "When toggled, if the mapped data differs from data in SDB, the SDB employee will be updated when an update event is triggerd"
-    }
-  },
-  {
     "key": "isDebug",
     "type": "checkbox",
     "defaultValue": false,

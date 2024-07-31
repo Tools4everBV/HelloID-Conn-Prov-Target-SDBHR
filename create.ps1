@@ -4,10 +4,6 @@
 # Version: 1.0.0
 # See https://api.sdbstart.nl/swagger/ui/index#!/Medewerkers/Medewerkers_Put for supported properties
 #####################################################
-#$actionContext.DryRun = $false
-
-#$MutationDate = $actionContext.Data.beginDatum.Substring(0,10) # startdate from contract
-#$MutationDate=[Datetime]::ParseExact($MutationDate, 'MM/dd/yyyy', $null).ToString('yyyy-MM-dd')
 
 $MutationDate = (Get-Date).ToString("yyyy-MM-dd") #currentdate
 
@@ -155,26 +151,13 @@ try {
     if (-not($actionContext.DryRun -eq $true)) {
         
         Write-Verbose 'Correlating user account'
-        $uri = "$($actionContext.Configuration.BaseUri)/medewerkers/$($currentAccount.Id)/$($MutationDate)"
-        $bodyobject = [PSCustomObject]@{}
-        $bodyobject | Add-Member -MemberType NoteProperty -Name EmailZakelijk -Value $actionContext.Data.EmailZakelijk -Force
-        $body = ($bodyobject | ConvertTo-Json -Depth 10) 
-          
-        $splatCorrelateParams = @{
-            Uri             = $uri
-            Headers         = $headers
-            Method          = "PUT"
-            Body            = ([System.Text.Encoding]::UTF8.GetBytes($body))
-            UseBasicParsing = $true
-        }
-        
-        $responseCorrelateAccount = Invoke-RestMethod @splatCorrelateParams -Verbose:$false 
+       
         
         $auditLogMessage = "Successfully correlated account on field [$correlationProperty] with value: [$($correlationValue)]" #"$action account was successful. AccountReference is: [$($outputContext.AccountReference)"
         $outputContext.success = $true
         $outputContext.AccountCorrelated = $true
         $outputContext.AuditLogs.Add([PSCustomObject]@{
-                Action  = 'CreateAccount'
+                Action  = 'CorrelateAccount'
                 Message = $auditLogMessage
                 IsError = $false
             })

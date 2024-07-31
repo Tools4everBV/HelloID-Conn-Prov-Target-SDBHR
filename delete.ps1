@@ -21,6 +21,7 @@ switch ($($actionContext.Configuration.isDebug)) {
 $InformationPreference = "Continue"
 $WarningPreference = "Continue"
 
+
 # Correlation values
 $correlation = [PSCustomObject]@{
     CorrelationProperty = "personeelsNummer" # Has to match the name of the unique identifier
