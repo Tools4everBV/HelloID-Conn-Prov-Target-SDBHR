@@ -4,8 +4,6 @@
 # See https://api.sdbstart.nl/swagger/ui/index#!/Medewerkers/Medewerkers_Put for supported properties
 #####################################################
 
-$MutationDate = (Get-Date).ToString("yyyy-MM-dd") #currentdate
-
 # AccountReference must have a value for dryRun
 $outputContext.AccountReference = "Unknown"
 
