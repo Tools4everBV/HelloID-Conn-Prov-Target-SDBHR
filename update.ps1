@@ -121,7 +121,7 @@ try {
     }
     $currentAccount = $null
     $currentAccount = Invoke-RestMethod @splatWebRequest -Verbose:$false
-    Write-Verbose -verbose $currentAccount
+
     if ($null -eq $currentAccount) {
         throw "No account found where  [$($correlation.CorrelationProperty)] = [$($correlation.CorrelationValue)]"
     }
