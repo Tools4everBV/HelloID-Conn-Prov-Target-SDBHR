@@ -1,7 +1,6 @@
 #####################################################
 # HelloID-Conn-Prov-Target-SDBHR-Create
 # PowerShell V2
-# Version: 1.0.0
 # See https://api.sdbstart.nl/swagger/ui/index#!/Medewerkers/Medewerkers_Put for supported properties
 #####################################################
 
