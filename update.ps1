@@ -124,8 +124,8 @@ try {
     else {
         # Create previous account object to compare current data with specified account data
         $previousAccount = $currentAccount | Select-Object $updateAccountFields
-        Write-Verbose -verbose $previousAccount
         $outputContext.PreviousData = $previousAccount
+        
         # Calculate changes between current data and provided data
         $splatCompareProperties = @{
             ReferenceObject  = @($previousAccount.PSObject.Properties)
@@ -166,9 +166,7 @@ try {
         }
     }
     
-    
     # Process
-    
     switch ($updateAction) {
         #region Update account
         "Update" {
@@ -246,14 +244,10 @@ try {
         }
         #endregion No changes to account
     }
-
- 
 }
 finally {
     # Check if auditLogs contains errors, if no errors are found, set success to true
     if (-not($outputContext.success -eq $false)) {
         $success = $true
     }
-
-
-}       
+}
