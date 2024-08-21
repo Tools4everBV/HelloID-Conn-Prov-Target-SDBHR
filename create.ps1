@@ -1,102 +1,85 @@
-#####################################################
+#################################################
 # HelloID-Conn-Prov-Target-SDBHR-Create
+# Correlate to account
 # PowerShell V2
-# See https://api.sdbstart.nl/swagger/ui/index#!/Medewerkers/Medewerkers_Put for supported properties
-#####################################################
-
-# AccountReference must have a value for dryRun
-$outputContext.AccountReference = "Unknown"
-
+#################################################
 # Enable TLS1.2
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor [System.Net.SecurityProtocolType]::Tls12
 
 # Set debug logging
-switch ($($actionContext.Configuration.isDebug)) {
-    $true { $VerbosePreference = 'Continue' }
-    $false { $VerbosePreference = 'SilentlyContinue' }
+switch ($actionContext.Configuration.isDebug) {
+    $true { $VerbosePreference = "Continue" }
+    $false { $VerbosePreference = "SilentlyContinue" }
 }
-
-$auditLogs = [System.Collections.Generic.List[PSCustomObject]]::new()
+$InformationPreference = "Continue"
+$WarningPreference = "Continue"
 
 #region functions
-function Resolve-HTTPError {
+function Resolve-SDBHRError {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory,
-            ValueFromPipeline
-        )]
-        [object]$ErrorObject
+        [Parameter(Mandatory)]
+        [object]
+        $ErrorObject
     )
     process {
         $httpErrorObj = [PSCustomObject]@{
-            FullyQualifiedErrorId = $ErrorObject.FullyQualifiedErrorId
-            MyCommand             = $ErrorObject.InvocationInfo.MyCommand
-            RequestUri            = $ErrorObject.TargetObject.RequestUri
-            ScriptStackTrace      = $ErrorObject.ScriptStackTrace
-            ErrorMessage          = ""
+            ScriptLineNumber = $ErrorObject.InvocationInfo.ScriptLineNumber
+            Line             = $ErrorObject.InvocationInfo.Line
+            ErrorDetails     = $ErrorObject.Exception.Message
+            FriendlyMessage  = $ErrorObject.Exception.Message
         }
-        if ($ErrorObject.Exception.GetType().FullName -eq "Microsoft.PowerShell.Commands.HttpResponseException") {
-            $httpErrorObj.ErrorMessage = $ErrorObject.ErrorDetails.Message
+        if (-not [string]::IsNullOrEmpty($ErrorObject.ErrorDetails.Message)) {
+            $httpErrorObj.ErrorDetails = $ErrorObject.ErrorDetails.Message
         }
-        elseif ($ErrorObject.Exception.GetType().FullName -eq "System.Net.WebException") {
-            $httpErrorObj.ErrorMessage = [System.IO.StreamReader]::new($ErrorObject.Exception.Response.GetResponseStream()).ReadToEnd()
+        elseif ($ErrorObject.Exception.GetType().FullName -eq 'System.Net.WebException') {
+            if ($null -ne $ErrorObject.Exception.Response) {
+                $streamReaderResponse = [System.IO.StreamReader]::new($ErrorObject.Exception.Response.GetResponseStream()).ReadToEnd()
+                if (-not [string]::IsNullOrEmpty($streamReaderResponse)) {
+                    $httpErrorObj.ErrorDetails = $streamReaderResponse
+                }
+            }
+        }
+        try {
+            # TODO Make sure to inspect the error result object and add only the error message as a FriendlyMessage.
+            # $errorDetailsObject = ($httpErrorObj.ErrorDetails | ConvertFrom-Json)
+            # $httpErrorObj.FriendlyMessage = $errorDetailsObject.message
+            $httpErrorObj.FriendlyMessage = $httpErrorObj.ErrorDetails # Temporarily assignment
+        }
+        catch {
+            $httpErrorObj.FriendlyMessage = $httpErrorObj.ErrorDetails
         }
         Write-Output $httpErrorObj
     }
 }
-
-function Get-ErrorMessage {
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory,
-            ValueFromPipeline
-        )]
-        [object]$ErrorObject
-    )
-    process {
-        $errorMessage = [PSCustomObject]@{
-            VerboseErrorMessage = $null
-            AuditErrorMessage   = $null
-        }
-
-        if ( $($ErrorObject.Exception.GetType().FullName -eq "Microsoft.PowerShell.Commands.HttpResponseException") -or $($ErrorObject.Exception.GetType().FullName -eq "System.Net.WebException")) {
-            $httpErrorObject = Resolve-HTTPError -Error $ErrorObject
-            $errorMessage.VerboseErrorMessage = $httpErrorObject.ErrorMessage
-            $errorMessage.AuditErrorMessage = $httpErrorObject.ErrorMessage
-        }
-
-        # If error message empty, fall back on $ex.Exception.Message
-        if ([String]::IsNullOrEmpty($errorMessage.VerboseErrorMessage)) {
-            $errorMessage.VerboseErrorMessage = $ErrorObject.Exception.Message
-        }
-        if ([String]::IsNullOrEmpty($errorMessage.AuditErrorMessage)) {
-            $errorMessage.AuditErrorMessage = $ErrorObject.Exception.Message
-        }
-
-        Write-Output $errorMessage
-    }
-}
 #endregion functions
 
+#region account
+# Define correlation
+$correlationField = $actionContext.CorrelationConfiguration.accountField
+$correlationValue = $actionContext.CorrelationConfiguration.personFieldValue
+#endRegion account
+
 try {
-    # Correlation setup
-    if ($actionContext.CorrelationConfiguration.Enabled) {
-        $correlationProperty = $actionContext.CorrelationConfiguration.accountField
-        $correlationValue = $actionContext.CorrelationConfiguration.accountFieldValue
+    #region Verify correlation configuration and properties
+    $actionMessage = "verifying correlation configuration and properties"
 
-        if ([string]::IsNullOrEmpty($correlationProperty)) {
-            throw  "Correlation is enabled but not configured correctly"
+    if ($actionContext.CorrelationConfiguration.Enabled -eq $true) {
+        if ([string]::IsNullOrEmpty($correlationField)) {
+            throw "Correlation is enabled but not configured correctly."
         }
-
+    
         if ([string]::IsNullOrEmpty($correlationValue)) {
-            throw "The correlation value for [$correlationProperty] is empty. This is likely a mapping issue"
+            throw "The correlation value for [$correlationField] is empty. This is likely a mapping issue."
         }
     }
     else {
-        throw "Configuration of correlation is mandatory"
+        throw "Correlation is disabled while this connector only supports correlation."
     }
+    #endregion Verify correlation configuration and properties
 
-    Write-Verbose "Creating SDB HR hash with Customer Number [$($actionContext.Configuration.CustomerNumber)]"
+    #region Create authentication hash
+    $actionMessage = "creating authentication hash with Customer Number [$($actionContext.Configuration.CustomerNumber)]"
 
     $currentDateTime = (Get-Date).ToString("dd-MM-yyyy HH:mm:ss.fff")
 
@@ -107,63 +90,133 @@ try {
     $hash = $hmac256.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($baseString))
     $hashedString = [System.Convert]::ToBase64String($hash)
 
-    Write-Verbose "Creating Headers for SDB HR API calls"
+    Write-Verbose "Created authentication hash with Customer Number [$($actionContext.Configuration.CustomerNumber)]. Result: $($hashedString | ConvertTo-Json)"
+    #endregion Create authentication hash
+
+    #region Create headers
+    $actionMessage = "creating headers"
 
     $headers = @{
         "Klantnummer"    = $actionContext.Configuration.CustomerNumber
         "Authentication" = "$($actionContext.Configuration.ApiUser):$($hashedString)"
         "Timestamp"      = $currentDateTime
-        "Content-Type"   = "application/json"
+        "Content-Type"   = "application/json;charset=utf-8"
         "Api-Version"    = "2.0"
     }
 
-    Write-Verbose "Querying account where [$correlationProperty] = [$correlationValue]"
+    Write-Verbose "Created headers. Result: $($headers | ConvertTo-Json)."
+    #endregion Create headers
 
-    $splatWebRequest = @{
-        Uri             = "$($actionContext.Configuration.BaseUri)/medewerkersbasic/$correlationValue"
-        Headers         = $headers
-        Method          = "GET"
-        ContentType     = "application/json;charset=utf-8"
-        UseBasicParsing = $true
-    }
-    $currentAccount = $null
-    $currentAccount = Invoke-RestMethod @splatWebRequest -Verbose:$false
-  
-    if ($null -eq $currentAccount) {
-        throw = "Error querying account where [$correlationProperty)] = [$correlationValue]"
-    }
-    Write-Verbose "Correlating to account [$($currentAccount.RoepNaam) $($currentAccount.AchterNaam) ($($currentAccount.Id))]"
+    if ($actionContext.CorrelationConfiguration.Enabled) {
+        #region Get SDBHR account
+        # SDBHR docs: https://api.sdbstart.nl/swagger/ui/index#!/Medewerkers/Medewerkers_GetMedewerkerV2
 
-    $outputContext.AccountReference = [PSCustomObject]@{
-        Id = $currentAccount.Id
+        $getSDBHRAccountSplatParams = @{
+            Uri             = "$($actionContext.Configuration.BaseUri)/medewerkersbasic/$correlationValue"
+            Headers         = $headers
+            Method          = "GET"
+            ContentType     = "application/json;charset=utf-8"
+            UseBasicParsing = $true
+            Verbose         = $false
+            ErrorAction     = "Stop"
+        }
+    
+        $getSDBHRAccountResponse = Invoke-RestMethod @getSDBHRAccountSplatParams
+        $correlatedAccount = $getSDBHRAccountResponse
+
+        Write-Verbose "Queried SDBHR account where [$($correlationField)] = [$($correlationValue)]. Result: $($correlatedAccount | ConvertTo-Json)"
+        #endregion Get SDBHR account
     }
-    # Add a message and the result of each of the validations showing what will happen during enforcement
-    if ($actionContext.DryRun -eq $true) {
-        Write-Warning "DryRun: Would correlate to account on field [$correlationProperty] with value: [$($correlationValue)]"
+
+    #region Account
+    #region Calulate action
+    $actionMessage = "calculating action"
+    if (($correlatedAccount | Measure-Object).count -eq 0) {
+        $actionAccount = "NotFound"
     }
-    # Process
-    if (-not($actionContext.DryRun -eq $true)) {  
-        Write-Verbose 'Correlating user account'
-       
-        $auditLogMessage = "Successfully correlated account on field [$correlationProperty] with value: [$($correlationValue)]" #"$action account was successful. AccountReference is: [$($outputContext.AccountReference)"
-        $outputContext.success = $true
-        $outputContext.AccountCorrelated = $true
-        $outputContext.AuditLogs.Add([PSCustomObject]@{
-                Action  = 'CorrelateAccount'
-                Message = $auditLogMessage
-                IsError = $false
-            })  
+    elseif (($correlatedAccount | Measure-Object).count -eq 1) {
+        $actionAccount = "Correlate"
     }
+    elseif (($correlatedAccount | Measure-Object).count -gt 1) {
+        $actionAccount = "MultipleFound"
+    }
+    #endregion Calulate action
+
+    #region Process
+    switch ($actionAccount) {
+        "Correlate" {
+            #region Correlate account
+            $actionMessage = "correlating to account"
+    
+            $outputContext.AccountReference = "$($correlatedAccount.id)"
+            $outputContext.Data = $correlatedAccount
+    
+            $outputContext.AuditLogs.Add([PSCustomObject]@{
+                    Action  = "CorrelateAccount" # Optionally specify a different action for this audit log
+                    Message = "Correlated to account with AccountReference: $($outputContext.AccountReference | ConvertTo-Json) on [$($correlationField)] = [$($correlationValue)]."
+                    IsError = $false
+                })
+    
+            $outputContext.AccountCorrelated = $true
+            #endregion Correlate account
+    
+            break
+        }
+    
+        "MultipleFound" {
+            #region Multiple accounts found
+            $actionMessage = "correlating to account"
+    
+            # Throw terminal error
+            throw "Multiple accounts found where [$($correlationField)] = [$($correlationValue)]. Please correct this so the persons are unique."
+            #endregion Multiple accounts found
+    
+            break
+        }
+
+        "NotFound" {
+            #region No account found
+            $actionMessage = "correlating to account"
+        
+            # Throw terminal error
+            throw "No account found where [$($correlationField)] = [$($correlationValue)] while this connector only supports correlation."
+            #endregion No account found
+
+            break
+        }
+    }
+    #endregion Process
 }
 catch {
     $ex = $PSItem
-    $errorMessage = Get-ErrorMessage -ErrorObject $ex
+    if ($($ex.Exception.GetType().FullName -eq 'Microsoft.PowerShell.Commands.HttpResponseException') -or
+        $($ex.Exception.GetType().FullName -eq 'System.Net.WebException')) {
+        $errorObj = Resolve-SDBHRError -ErrorObject $ex
+        $auditMessage = "Error $($actionMessage). Error: $($errorObj.FriendlyMessage)"
+        Write-Warning "Error at Line [$($errorObj.ScriptLineNumber)]: $($errorObj.Line). Error: $($errorObj.ErrorDetails)"
+    }
+    else {
+        $auditMessage = "Error $($actionMessage). Error: $($ex.Exception.Message)"
+        Write-Warning "Error at Line [$($ex.InvocationInfo.ScriptLineNumber)]: $($ex.InvocationInfo.Line). Error: $($ex.Exception.Message)"
+    }
 
-    Write-Warning "Error correlating account on field [$($correlationField)] with value: [$($correlationValue)] at Line [$($ex.InvocationInfo.ScriptLineNumber)]: $($ex.InvocationInfo.Line). Error: $($errorMessage.VerboseErrorMessage)"
-
-    $auditLogs.Add([PSCustomObject]@{
-            Action  = "CorrelateAccount"
-            Message = "Error correlating account on field [$($correlationField)] with value: [$($correlationValue)]: $($errorMessage.AuditErrorMessage)"
+    $outputContext.AuditLogs.Add([PSCustomObject]@{
+            # Action  = "" # Optional
+            Message = $auditMessage
             IsError = $true
         })
+}
+finally {
+    # Check if auditLogs contains errors, if no errors are found, set success to true
+    if ($outputContext.AuditLogs.IsError -contains $true) {
+        $outputContext.Success = $false
+    }
+    else {
+        $outputContext.Success = $true
+    }
+
+    # Check if accountreference is set, if not set, set this with default value as this must contain a value
+    if ([String]::IsNullOrEmpty($outputContext.AccountReference) -and $actionContext.DryRun -eq $true) {
+        $outputContext.AccountReference = "DryRun: Currently not available"
+    }
 }
