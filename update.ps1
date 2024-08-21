@@ -17,6 +17,8 @@ switch ($($actionContext.Configuration.isDebug)) {
     $false { $VerbosePreference = 'SilentlyContinue' }
 }
 
+$account = [PSCustomObject]$actionContext.Data
+
 # Define account properties to update # delete after creation of update script
 $updateAccountFields = $actionContext.Data.PSObject.Properties.Name
 
@@ -129,9 +131,7 @@ try {
         # Calculate changes between current data and provided data
         $splatCompareProperties = @{
             ReferenceObject  = @($previousAccount.PSObject.Properties)
-            DifferenceObject = @($actionContext.Data.PSObject.Properties | Where-Object { $_.Name -in $updateAccountFields }) # Only select the properties to update
-            #DifferenceObject = @($account.PSObject.Properties | Where-Object { $_.Name -in $updateAccountFields }) # Only select the properties to update
-
+            DifferenceObject = @($account.PSObject.Properties | Where-Object { $_.Name -in $updateAccountFields }) # Only select the properties to update
         }
         $changedProperties = $null
         $changedProperties = (Compare-Object @splatCompareProperties -PassThru)
