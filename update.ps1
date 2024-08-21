@@ -22,6 +22,8 @@ $account = [PSCustomObject]$actionContext.Data
 # Define account properties to update # delete after creation of update script
 $updateAccountFields = $actionContext.Data.PSObject.Properties.Name
 
+$MutationDate = (Get-Date).ToString("yyyy-MM-dd") #currentdate
+
 #region functions
 function Resolve-HTTPError {
     [CmdletBinding()]
@@ -172,7 +174,7 @@ try {
         "Update" {
             # Update account
             $uri = "$($actionContext.Configuration.BaseUri)/medewerkers/$($currentAccount.Id)/$($MutationDate)"
-       
+
             try {
                 # Create custom account object for update and set with default properties and values
                 $updateAccountObject = [PSCustomObject]@{}
