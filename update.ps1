@@ -20,9 +20,6 @@ switch ($($actionContext.Configuration.isDebug)) {
 # Define account properties to update # delete after creation of update script
 $updateAccountFields = $actionContext.Data.PSObject.Properties.Name
 
-# Define account properties to store in account data
-$storeAccountFields = $actionContext.Data.PSObject.Properties.Name # all mapped fields
-
 #region functions
 function Resolve-HTTPError {
     [CmdletBinding()]
