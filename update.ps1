@@ -17,8 +17,6 @@ switch ($($actionContext.Configuration.isDebug)) {
     $false { $VerbosePreference = 'SilentlyContinue' }
 }
 
-$auditLogs = [System.Collections.Generic.List[PSCustomObject]]::new()
-
 # Define account properties to update # delete after creation of update script
 $updateAccountFields = $actionContext.Data.PSObject.Properties.Name
 
