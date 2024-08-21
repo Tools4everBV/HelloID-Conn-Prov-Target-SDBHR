@@ -142,11 +142,9 @@ try {
         Write-Warning "DryRun: Would correlate to account on field [$correlationProperty] with value: [$($correlationValue)]"
     }
     # Process
-    if (-not($actionContext.DryRun -eq $true)) {
-        
+    if (-not($actionContext.DryRun -eq $true)) {  
         Write-Verbose 'Correlating user account'
        
-        
         $auditLogMessage = "Successfully correlated account on field [$correlationProperty] with value: [$($correlationValue)]" #"$action account was successful. AccountReference is: [$($outputContext.AccountReference)"
         $outputContext.success = $true
         $outputContext.AccountCorrelated = $true
@@ -154,8 +152,7 @@ try {
                 Action  = 'CorrelateAccount'
                 Message = $auditLogMessage
                 IsError = $false
-            })
-            
+            })  
     }
 }
 catch {
