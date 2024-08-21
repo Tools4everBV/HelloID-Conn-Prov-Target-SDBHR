@@ -20,9 +20,6 @@ switch ($($actionContext.Configuration.isDebug)) {
 
 $auditLogs = [System.Collections.Generic.List[PSCustomObject]]::new()
 
-# Define account properties to store in account data
-$storeAccountFields = $actionContext.Data.PSObject.Properties.Name # all mapped fields
-
 #region functions
 function Resolve-HTTPError {
     [CmdletBinding()]
