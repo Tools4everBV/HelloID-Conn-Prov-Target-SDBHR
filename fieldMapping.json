@@ -2,22 +2,6 @@
   "Version": "v1",
   "MappingFields": [
     {
-      "Name": "beginDatum",
-      "Description": "",
-      "Type": "Text",
-      "MappingActions": [
-        {
-          "MapForActions": [
-            "Create"
-          ],
-          "MappingMode": "Field",
-          "Value": "\"Person.PrimaryContract.StartDate\"",
-          "UsedInNotifications": false,
-          "StoreInAccountData": false
-        }
-      ]
-    },
-    {
       "Name": "personeelsNummer",
       "Description": "",
       "Type": "Text",
@@ -29,7 +13,7 @@
           "MappingMode": "Field",
           "Value": "\"Person.ExternalId\"",
           "UsedInNotifications": false,
-          "StoreInAccountData": false
+          "StoreInAccountData": true
         }
       ]
     },
@@ -44,7 +28,7 @@
             "Update"
           ],
           "MappingMode": "Complex",
-          "Value": "\"function getEmail() \\r\\n{    let mail = '';    \\r\\n    if (typeof Person.Accounts.MicrosoftActiveDirectory.mail !== 'undefined' && Person.Accounts.MicrosoftActiveDirectory.mail) \\r\\n    {mail = Person.Accounts.MicrosoftActiveDirectory.mail;\\r\\n    }    \\r\\n    return mail;\\r\\n    }getEmail()\"",
+          "Value": "\"function getEmail() {\\r\\n    let mail = Person.Accounts.MicrosoftActiveDirectory.mail;\\r\\n\\r\\n    return mail;\\r\\n}\\r\\n\\r\\ngetEmail();\"",
           "UsedInNotifications": false,
           "StoreInAccountData": true
         },
@@ -52,7 +36,7 @@
           "MapForActions": [
             "Delete"
           ],
-          "MappingMode": "None",
+          "MappingMode": "Fixed",
           "Value": "\"\"",
           "UsedInNotifications": false,
           "StoreInAccountData": false
