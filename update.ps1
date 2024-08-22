@@ -215,13 +215,13 @@ try {
 
             if (-Not($actionContext.DryRun -eq $true)) {
                 # Add header after printing splat
-                $createAccountSplatParams['Headers'] = $headers
+                $updateAccountSplatParams['Headers'] = $headers
 
-                $createAccountResponse = Invoke-RestMethod @createAccountSplatParams
-                $createdAccount = $createAccountResponse
+                $updateAccountResponse = Invoke-RestMethod @updateAccountSplatParams
+                $updatedAccount = $updateAccountResponse
 
-                $outputContext.AccountReference = "$($createdAccount.id)"
-                $outputContext.Data = $createdAccount
+                $outputContext.AccountReference = "$($updatedAccount.id)"
+                $outputContext.Data = $updatedAccount
 
                 $outputContext.AuditLogs.Add([PSCustomObject]@{
                         # Action  = "" # Optional
