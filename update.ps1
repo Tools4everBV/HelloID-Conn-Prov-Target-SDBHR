@@ -141,7 +141,7 @@ try {
     }
     elseif (($correlatedAccount | Measure-Object).count -eq 1) {
         # Create previous account object to compare current data with specified account data
-        $previousAccount = $currentAccount | Select-Object $accountPropertiesToCompare
+        $previousAccount = $correlatedAccount | Select-Object $accountPropertiesToCompare
         $outputContext.PreviousData = $previousAccount
 
         # Calculate changes between current data and provided data
