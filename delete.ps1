@@ -57,7 +57,7 @@ function Resolve-SDBHRError {
 #region account
 # Define correlation
 $correlationField = "Id"
-$correlationValue = $actionContext.References.Account.Id
+$correlationValue = $actionContext.References.Account
 
 $account = [PSCustomObject]$actionContext.Data
 
