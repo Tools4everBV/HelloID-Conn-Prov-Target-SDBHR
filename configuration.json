@@ -43,15 +43,5 @@
       "description": "The customer number for which the request is executed, you may be authorized for multiple clients within the WebAPI therefore we always want to know which client number the requests are intended for. In many cases the customer number is equal to the user",
       "required": true
     }
-  },
-  {
-    "key": "isDebug",
-    "type": "checkbox",
-    "defaultValue": false,
-    "templateOptions": {
-      "label": "Toggle debug logging",
-      "description": "When toggled, debug logging will be displayed",
-      "required": false
-    }
   }
 ]

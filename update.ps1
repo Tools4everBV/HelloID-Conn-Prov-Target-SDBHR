@@ -3,16 +3,9 @@
 # Update account
 # PowerShell V2
 #################################################
+
 # Enable TLS1.2
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor [System.Net.SecurityProtocolType]::Tls12
-
-# Set debug logging
-switch ($actionContext.Configuration.isDebug) {
-    $true { $VerbosePreference = "Continue" }
-    $false { $VerbosePreference = "SilentlyContinue" }
-}
-$InformationPreference = "Continue"
-$WarningPreference = "Continue"
 
 #region functions
 function Resolve-SDBHRError {
@@ -66,22 +59,12 @@ $accountPropertiesToCompare = $account.PsObject.Properties.Name
 #endRegion account
 
 try {
-    #region Verify correlation configuration and properties
-    $actionMessage = "verifying correlation configuration and properties"
-
-    if ($actionContext.CorrelationConfiguration.Enabled -eq $true) {
-        if ([string]::IsNullOrEmpty($correlationField)) {
-            throw "Correlation is enabled but not configured correctly."
-        }
-    
-        if ([string]::IsNullOrEmpty($correlationValue)) {
-            throw "The correlation value for [$correlationField] is empty. This is likely a mapping issue."
-        }
+    #region Verify account reference
+    $actionMessage = "verifying account reference"
+    if ([string]::IsNullOrEmpty($($actionContext.References.Account))) {
+        throw "The account reference could not be found"
     }
-    else {
-        throw "Correlation is disabled while this connector only supports correlation."
-    }
-    #endregion Verify correlation configuration and properties
+    #endregion Verify account reference
 
     #region Create authentication hash
     $actionMessage = "creating authentication hash with Customer Number [$($actionContext.Configuration.CustomerNumber)]"
@@ -95,7 +78,7 @@ try {
     $hash = $hmac256.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($baseString))
     $hashedString = [System.Convert]::ToBase64String($hash)
 
-    Write-Verbose "Created authentication hash with Customer Number [$($actionContext.Configuration.CustomerNumber)]. Result: $($hashedString | ConvertTo-Json)"
+    Write-Information "Created authentication hash with Customer Number [$($actionContext.Configuration.CustomerNumber)]."
     #endregion Create authentication hash
 
     #region Create headers
@@ -109,29 +92,26 @@ try {
         "Api-Version"    = "2.0"
     }
 
-    Write-Verbose "Created headers. Result: $($headers | ConvertTo-Json)."
+    Write-Information "Created headers."
     #endregion Create headers
 
-    if ($actionContext.CorrelationConfiguration.Enabled) {
-        #region Get account
-        # SDBHR docs: https://api.sdbstart.nl/swagger/ui/index#!/Medewerkers/Medewerkers_GetMedewerkerV2
+    #region Get account
+    # SDBHR docs: https://api.sdbstart.nl/swagger/ui/index#!/Medewerkers/Medewerkers_GetMedewerkerV2
 
-        $getSDBHRAccountSplatParams = @{
-            Uri             = "$($actionContext.Configuration.BaseUri)/medewerkersbasic/$correlationValue"
-            Headers         = $headers
-            Method          = "GET"
-            ContentType     = "application/json;charset=utf-8"
-            UseBasicParsing = $true
-            Verbose         = $false
-            ErrorAction     = "Stop"
-        }
-    
-        $getSDBHRAccountResponse = Invoke-RestMethod @getSDBHRAccountSplatParams
-        $correlatedAccount = $getSDBHRAccountResponse
-
-        Write-Verbose "Queried SDBHR account where [$($correlationField)] = [$($correlationValue)]. Result: $($correlatedAccount | ConvertTo-Json)"
-        #endregion Get account
+    $getSDBHRAccountSplatParams = @{
+        Uri             = "$($actionContext.Configuration.BaseUri)/medewerkersbasic/$correlationValue"
+        Headers         = $headers
+        Method          = "GET"
+        ContentType     = "application/json;charset=utf-8"
+        UseBasicParsing = $true
+        Verbose         = $false
+        ErrorAction     = "Stop"
     }
+    
+    $correlatedAccount = Invoke-RestMethod @getSDBHRAccountSplatParams
+
+    Write-Information "Queried SDBHR account where [$($correlationField)] = [$($correlationValue)]. Result: $($correlatedAccount | ConvertTo-Json)"
+    #endregion Get account
 
     #region Account
     #region Calulate action
@@ -171,12 +151,12 @@ try {
             foreach ($newProperty in $newProperties) {
                 $changedPropertiesObject.NewValues.$($newProperty.Name) = $newProperty.Value
             }
-            Write-Verbose "Changed properties: $($changedPropertiesObject | ConvertTo-Json)"
+            Write-Information "Changed properties: $($changedPropertiesObject | ConvertTo-Json)"
 
             $actionAccount = 'Update'
         }
         else {
-            Write-Verbose "No changed properties"
+            Write-Information "No changed properties"
 
             $actionAccount = 'NoChanges'
         }
@@ -211,7 +191,7 @@ try {
                 ErrorAction = "Stop"
             }
 
-            Write-Verbose "SplatParams: $($updateAccountSplatParams | ConvertTo-Json)"
+            Write-Information "SplatParams: $($updateAccountSplatParams | ConvertTo-Json)"
 
             if (-Not($actionContext.DryRun -eq $true)) {
                 # Add header after printing splat

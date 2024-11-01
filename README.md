@@ -13,6 +13,7 @@
   - [Table of Contents](#table-of-contents)
   - [Requirements](#requirements)
   - [Remarks](#remarks)
+    - [Errorhandling](#errorhandling)
     - [Handling Null Values in Field Mapping](#handling-null-values-in-field-mapping)
     - [Clearing Business Email Addresses](#clearing-business-email-addresses)
   - [Introduction](#introduction)
@@ -31,6 +32,10 @@
 - **Permissions**: Required to update the Business Email Address. Without these, a 401 unauthorized error will occur.
 
 ## Remarks
+
+### Errorhandling
+
+- The error handling `Resolve-SDBHRError` in the script has not been tested. Please change accordingly if needed.
 
 ### Handling Null Values in Field Mapping
 

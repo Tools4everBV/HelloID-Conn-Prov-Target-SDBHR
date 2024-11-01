@@ -3,16 +3,9 @@
 # Correlate to account
 # PowerShell V2
 #################################################
+
 # Enable TLS1.2
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor [System.Net.SecurityProtocolType]::Tls12
-
-# Set debug logging
-switch ($actionContext.Configuration.isDebug) {
-    $true { $VerbosePreference = "Continue" }
-    $false { $VerbosePreference = "SilentlyContinue" }
-}
-$InformationPreference = "Continue"
-$WarningPreference = "Continue"
 
 #region functions
 function Resolve-SDBHRError {
@@ -90,7 +83,7 @@ try {
     $hash = $hmac256.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($baseString))
     $hashedString = [System.Convert]::ToBase64String($hash)
 
-    Write-Verbose "Created authentication hash with Customer Number [$($actionContext.Configuration.CustomerNumber)]. Result: $($hashedString | ConvertTo-Json)"
+    Write-Information "Created authentication hash with Customer Number [$($actionContext.Configuration.CustomerNumber)]."
     #endregion Create authentication hash
 
     #region Create headers
@@ -104,7 +97,7 @@ try {
         "Api-Version"    = "2.0"
     }
 
-    Write-Verbose "Created headers. Result: $($headers | ConvertTo-Json)."
+    Write-Information "Created headers."
     #endregion Create headers
 
     if ($actionContext.CorrelationConfiguration.Enabled) {
@@ -121,10 +114,9 @@ try {
             ErrorAction     = "Stop"
         }
     
-        $getSDBHRAccountResponse = Invoke-RestMethod @getSDBHRAccountSplatParams
-        $correlatedAccount = $getSDBHRAccountResponse
+        $correlatedAccount = Invoke-RestMethod @getSDBHRAccountSplatParams
 
-        Write-Verbose "Queried SDBHR account where [$($correlationField)] = [$($correlationValue)]. Result: $($correlatedAccount | ConvertTo-Json)"
+        Write-Information "Queried SDBHR account where [$($correlationField)] = [$($correlationValue)]. Result: $($correlatedAccount | ConvertTo-Json)"
         #endregion Get SDBHR account
     }
 
