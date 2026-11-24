@@ -1,6 +1,6 @@
 #################################################
 # HelloID-Conn-Prov-Target-SDBHR-Delete
-# Update account
+# Delete account (SDBHR has no delete, so the account is updated with the values of the Delete mapping)
 # PowerShell V2
 #################################################
 
@@ -171,7 +171,7 @@ try {
         "Update" {
             #region Update account
             # SDBHR docs: https://api.sdbstart.nl/swagger/ui/index#!/Medewerkers/Medewerkers_Put
-            $actionMessage = "updating account"
+            $actionMessage = "deleting account"
 
             # Create custom account object for update and set with default properties and values
             $updateAccountBody = [PSCustomObject]@{}
@@ -200,17 +200,16 @@ try {
                 $updateAccountResponse = Invoke-RestMethod @updateAccountSplatParams
                 $updatedAccount = $updateAccountResponse
 
-                $outputContext.AccountReference = "$($updatedAccount.id)"
                 $outputContext.Data = $updatedAccount
 
                 $outputContext.AuditLogs.Add([PSCustomObject]@{
                         # Action  = "" # Optional
-                        Message = "Updated account with AccountReference: $($outputContext.AccountReference | ConvertTo-Json). Updated properties: $($changedPropertiesObject | ConvertTo-Json -Depth 10)."
+                        Message = "Deleted account with AccountReference: $($actionContext.References.Account | ConvertTo-Json). Updated properties: $($changedPropertiesObject | ConvertTo-Json -Depth 10)."
                         IsError = $false
                     })
             }
             else {
-                Write-Warning "DryRun: Would update account with AccountReference: $($outputContext.AccountReference | ConvertTo-Json). Updated properties: $($changedPropertiesObject | ConvertTo-Json -Depth 10)."
+                Write-Warning "DryRun: Would delete account with AccountReference: $($actionContext.References.Account | ConvertTo-Json). Updated properties: $($changedPropertiesObject | ConvertTo-Json -Depth 10)."
             }
             #endregion Update account
     
@@ -219,13 +218,13 @@ try {
 
         "NoChanges" {
             #region No changes
-            $actionMessage = "skipping updating account"
+            $actionMessage = "skipping deleting account"
 
             $outputContext.Data = $correlatedAccount
 
             $outputContext.AuditLogs.Add([PSCustomObject]@{
                     # Action  = "" # Optional
-                    Message = "Skipped updating account with AccountReference: $($actionContext.References.Account | ConvertTo-Json). Reason: No changes."
+                    Message = "Skipped deleting account with AccountReference: $($actionContext.References.Account | ConvertTo-Json). Reason: No changes, account is already in the deleted state."
                     IsError = $false
                 })
             #endregion No changes
@@ -235,7 +234,7 @@ try {
 
         "MultipleFound" {
             #region Multiple accounts found
-            $actionMessage = "updating account"
+            $actionMessage = "deleting account"
     
             # Throw terminal error
             throw "Multiple accounts found where [$($correlationField)] = [$($correlationValue)]. Please correct this so the persons are unique."
@@ -246,12 +245,12 @@ try {
 
         "NotFound" {
             #region No account found
-            $actionMessage = "updating account"
-        
-            # Throw terminal error
+            $actionMessage = "deleting account"
+
+            # Not an error: the account is probably already deleted or was never correlated
             $outputContext.AuditLogs.Add([PSCustomObject]@{
                     # Action  = "" # Optional
-                    Message = "No account found where [$($correlationField)] = [$($correlationValue)] action skipped. Possibly indicating that it could be deleted, or not correlated."
+                    Message = "Skipped deleting account with AccountReference: $($actionContext.References.Account | ConvertTo-Json). Reason: No account found where [$($correlationField)] = [$($correlationValue)]. Possibly indicating that it was already deleted, or not correlated."
                     IsError = $false
                 })
             #endregion No account found
@@ -274,10 +273,11 @@ catch {
         Write-Warning "Error at Line [$($ex.InvocationInfo.ScriptLineNumber)]: $($ex.InvocationInfo.Line). Error: $($ex.Exception.Message)"
     }
 
-    if ($auditMessage -like "No account found where [$($correlationField)] = [$($correlationValue)]") {
+    if ($ex.Exception.Response.StatusCode -eq [System.Net.HttpStatusCode]::NotFound) {
+        # Account does not exist (anymore), so there is nothing to delete
         $outputContext.AuditLogs.Add([PSCustomObject]@{
                 # Action  = "" # Optional
-                Message = "Skipped updating account with AccountReference: $($actionContext.References.Account | ConvertTo-Json). Reason: No changes. Reason: No account found where [$($correlationField)] = [$($correlationValue)]."
+                Message = "Skipped deleting account with AccountReference: $($actionContext.References.Account | ConvertTo-Json). Reason: No account found where [$($correlationField)] = [$($correlationValue)]. Possibly indicating that it was already deleted, or not correlated."
                 IsError = $false
             })
     }
@@ -286,7 +286,7 @@ catch {
                 # Action  = "" # Optional
                 Message = $auditMessage
                 IsError = $true
-            })     
+            })
     }
 }
 finally {
@@ -296,10 +296,5 @@ finally {
     }
     else {
         $outputContext.Success = $true
-    }
-
-    # Check if accountreference is set, if not set, set this with default value as this must contain a value
-    if ([String]::IsNullOrEmpty($outputContext.AccountReference) -and $actionContext.DryRun -eq $true) {
-        $outputContext.AccountReference = "DryRun: Currently not available"
     }
 }
